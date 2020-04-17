@@ -1,7 +1,9 @@
 import os
+import os
 import urllib
 import boto3
 import logging
+from botocore.vendored import requests
 
 SUPPORTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png']  # Supported image types
 MAX_SIZE = 5242880  # Max number of image bytes supported by Amazon Rekognition (5MiB)
@@ -13,34 +15,51 @@ rekognition = boto3.client('rekognition')
 
 
 def lambda_handler(event, context):
-    try:
-        print('Validating message...')
-        if not verify_token(event):  # Ignore event if verification token presented doesn't match
-            return
+    if 'X-Slack-Retry-Num' in event['headers']:
+        slk_retry = event['headers']['X-Slack-Retry-Num']
+        return 200
+    else:
 
-        if event.get('challenge') is not None:  # Respond to Slack event subscription URL verification challenge
-            print('Presented with URL verification challenge- responding accordingly...')
-            challenge = event['challenge']
-            return {'challenge': challenge}
+        try:
+            event = event['body']
+            print('Validating message...')
+            if not verify_token(event):  # Ignore event if verification token presented doesn't match
+                return
 
-        if not validate_event(event):  # Ignore event if Slack message doesn't contain any supported images
-            return
+            if event.get('challenge') is not None:  # Respond to Slack event subscription URL verification challenge
+                print('Presented with URL verification challenge- responding accordingly...')
+                challenge = event['challenge']
+                return {'challenge': challenge}
 
-        event_details = event['event']
-        file_details = event_details['files'][0]
+            if not validate_event(event,
+                                  event['token']):  # Ignore event if Slack message doesn't contain any supported images
+                return
 
-        channel = event_details['channel']
-        url = file_details['url_private']
-        file_id = file_details['id']
+            event_details = event['event']
+            file_details = event_details['files'][0]
 
-        print('Downloading image...')
-        image_bytes = download_image(url)
-        print('Checking for MAC Address...')
-        message = find_mac(image_bytes)
-        post_message(channel, message)
+            # file_id = event_details['file_id']
+            # args = {
+            # "token": token,
+            # "file": file_id
+            # }
+            # response = requests.get('https://slack.com/api/files.info', params=args).json()
 
-    except Exception as error:
-        logging.exception("message")
+            # channel = response['file']['channels'][0]
+            # url = response['file']['url_private']
+
+            channel = event_details['channel']
+            url = file_details['url_private']
+            file_id = file_details['id']
+
+            print('Downloading image...')
+            image_bytes = download_image(url)
+            print('Checking for MAC Address...')
+            message = find_mac(image_bytes)
+            post_message(channel, message)
+
+        except Exception as error:
+            logging.exception("message")
 
 
 def verify_token(event):
@@ -61,7 +80,7 @@ def verify_token(event):
     return True
 
 
-def validate_event(event):
+def validate_event(event, token):
     """ Validates event by checking contained Slack message for image of supported type and size.
 
     Args:
@@ -73,7 +92,23 @@ def validate_event(event):
         False otherwise.
     """
     event_details = event['event']
+    print(event_details)  # added
     file_subtype = event_details.get('subtype')
+    # file_type = event_details.get('type')
+
+    # if file_type != 'file_shared':
+    #     print('Not a file_shared event- ignoring event...')
+    #     return False
+
+    # file_id = event_details['file_id']
+    # args = {
+    #     "token": token,
+    #     "file": file_id
+    # }
+    # response = requests.get('https://slack.com/api/files.info', params=args).json()
+    # print(response)
+    # mime_type = response['file']['mimetype']
+    # file_size = response['file']['size']
 
     if file_subtype != 'file_share':
         print('Not a file_shared event- ignoring event...')
@@ -131,11 +166,11 @@ def find_mac(image_bytes):
     except Exception as e:
         print(e)
         print('Unable to detect text in image.')
-        raise(e)
+        raise (e)
 
     textdetections = response['TextDetections']
     for textdetection in textdetections:
-        if "MAC" in textdetection['DetectedText']:
+        if "MAC Address" in textdetection['DetectedText']:
             ans = textdetection['DetectedText']
             return ans + " was sent to IT. They'll connect you to the network!"
     return "No MAC Address in screenshot"
