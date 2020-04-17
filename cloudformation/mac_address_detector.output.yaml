@@ -55,11 +55,7 @@ Resources:
       Handler: find_mac.lambda_handler
       Runtime: python3.6
       Timeout: 10
-      CodeUri: s3://patrick-demo-bucket/309d6d10cae553e20f08d7b6ef095d24
-      Role:
-        Fn::GetAtt:
-        - LambdaRekognitionRole
-        - Arn
+      CodeUri: s3://patrick-demo-bucket/3c52e084a69b4f4b5e845beb7e4fc382
       Environment:
         Variables:
           VERIFICATION_TOKEN:
@@ -74,29 +70,8 @@ Resources:
             Method: post
             RestApiId:
               Ref: MACDetectorAPI
-      LambdaRekognitionRole:
-        Type: AWS::IAM::Role
-        Properties:
-          AssumeRolePolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-            - Sid: AllowLambdaServiceToAssumeRole
-              Effect: Allow
-              Action:
-              - sts:AssumeRole
-              Principal:
-                Service:
-                - lambda.amazonaws.com
-          Path: /
-          Policies:
-          - PolicyName: RekognitionDetectText
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-              - Effect: Allow
-                Action:
-                - rekognition:DetectText
-                Resource: '*'
+      Policies:
+      - RekognitionLabelsPolicy: {}
 Outputs:
   RequestURL:
     Description: Prod URL for API to use as Request URL for Slack app

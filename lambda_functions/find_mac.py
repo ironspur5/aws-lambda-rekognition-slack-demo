@@ -1,6 +1,7 @@
 import os
 import urllib
 import boto3
+import logging
 
 SUPPORTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png']  # Supported image types
 MAX_SIZE = 5242880  # Max number of image bytes supported by Amazon Rekognition (5MiB)
@@ -12,30 +13,34 @@ rekognition = boto3.client('rekognition')
 
 
 def lambda_handler(event, context):
-    print('Validating message...')
-    if not verify_token(event):  # Ignore event if verification token presented doesn't match
-        return
+    try:
+        print('Validating message...')
+        if not verify_token(event):  # Ignore event if verification token presented doesn't match
+            return
 
-    if event.get('challenge') is not None:  # Respond to Slack event subscription URL verification challenge
-        print('Presented with URL verification challenge- responding accordingly...')
-        challenge = event['challenge']
-        return {'challenge': challenge}
+        if event.get('challenge') is not None:  # Respond to Slack event subscription URL verification challenge
+            print('Presented with URL verification challenge- responding accordingly...')
+            challenge = event['challenge']
+            return {'challenge': challenge}
 
-    if not validate_event(event):  # Ignore event if Slack message doesn't contain any supported images
-        return
+        if not validate_event(event):  # Ignore event if Slack message doesn't contain any supported images
+            return
 
-    event_details = event['event']
-    file_details = event_details['files'][0]
+        event_details = event['event']
+        file_details = event_details['files'][0]
 
-    channel = event_details['channel']
-    url = file_details['url_private']
-    file_id = file_details['id']
+        channel = event_details['channel']
+        url = file_details['url_private']
+        file_id = file_details['id']
 
-    print('Downloading image...')
-    image_bytes = download_image(url)
-    print('Checking for MAC Address...')
-    message = find_mac(image_bytes)
-    post_message(channel, message)
+        print('Downloading image...')
+        image_bytes = download_image(url)
+        print('Checking for MAC Address...')
+        message = find_mac(image_bytes)
+        post_message(channel, message)
+
+    except Exception as error:
+        logging.exception("message")
 
 
 def verify_token(event):
@@ -60,7 +65,7 @@ def validate_event(event):
     """ Validates event by checking contained Slack message for image of supported type and size.
 
     Args:
-        event (dict): Details about Slack message and any attachements.
+        event (dict): Details about Slack message and any attachments.
 
     Returns:
         (boolean)
