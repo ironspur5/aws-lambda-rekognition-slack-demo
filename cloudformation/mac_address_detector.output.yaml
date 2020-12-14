@@ -55,7 +55,7 @@ Resources:
       Handler: find_mac.lambda_handler
       Runtime: python3.6
       Timeout: 10
-      CodeUri: s3://patrick-demo-bucket/cd6e6be4602b831b92dce1eb37d833a4
+      CodeUri: s3://your-bucket-here
       Environment:
         Variables:
           VERIFICATION_TOKEN:
